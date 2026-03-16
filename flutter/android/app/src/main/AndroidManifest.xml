@@ -31,17 +31,6 @@
         android:supportsRtl="true">
 
         <receiver
-            android:name=".AutomationReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.carriez.flutter_hbb.action.START_HOST" />
-                <action android:name="com.carriez.flutter_hbb.action.STOP_HOST" />
-                <action android:name="com.carriez.flutter_hbb.action.OPEN_PERMISSIONS" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
             android:name=".BootReceiver"
             android:enabled="true"
             android:exported="true">
