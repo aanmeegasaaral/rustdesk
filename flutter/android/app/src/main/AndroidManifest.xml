@@ -29,7 +29,16 @@
         android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true">
-
+        <receiver
+            android:name=".AutomationReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.carriez.flutter_hbb.action.START_RUSTDESK_SERVICE" />
+                <action android:name="com.carriez.flutter_hbb.action.STOP_RUSTDESK_SERVICE" />
+                <action android:name="com.carriez.flutter_hbb.action.GET_RUSTDESK_ID" />
+            </intent-filter>
+        </receiver>
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
