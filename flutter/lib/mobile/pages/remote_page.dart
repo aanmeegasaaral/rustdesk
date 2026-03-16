@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -65,9 +64,8 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   bool _showGestureHelp = false;
   String _value = '';
   Orientation? _currentOrientation;
-  double _viewInsetsBottom = 0;
   final _uniqueKey = UniqueKey();
-  Timer? _timerDidChangeMetrics;
+  Timer? _iosKeyboardWorkaroundTimer;
 
   final _blockableOverlayState = BlockableOverlayState();
 
@@ -139,7 +137,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     _physicalFocusNode.dispose();
     await gFFI.close();
     _timer?.cancel();
-    _timerDidChangeMetrics?.cancel();
+    _iosKeyboardWorkaroundTimer?.cancel();
     gFFI.dialogManager.dismissAll();
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
         overlays: SystemUiOverlay.values);
@@ -165,26 +163,6 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     gFFI.invokeMethod("try_sync_clipboard");
   }
 
-  @override
-  void didChangeMetrics() {
-    // If the soft keyboard is visible and the canvas has been changed(panned or scaled)
-    // Don't try reset the view style and focus the cursor.
-    if (gFFI.cursorModel.lastKeyboardIsVisible &&
-        gFFI.canvasModel.isMobileCanvasChanged) {
-      return;
-    }
-
-    final newBottom = MediaQueryData.fromView(ui.window).viewInsets.bottom;
-    _timerDidChangeMetrics?.cancel();
-    _timerDidChangeMetrics = Timer(Duration(milliseconds: 100), () async {
-      // We need this comparation because poping up the floating action will also trigger `didChangeMetrics()`.
-      if (newBottom != _viewInsetsBottom) {
-        gFFI.canvasModel.mobileFocusCanvasCursor();
-        _viewInsetsBottom = newBottom;
-      }
-    });
-  }
-
   // to-do: It should be better to use transparent color instead of the bgColor.
   // But for now, the transparent color will cause the canvas to be white.
   // I'm sure that the white color is caused by the Overlay widget in BlockableOverlay.
@@ -206,7 +184,24 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
           gFFI.ffiModel.pi.version.isNotEmpty) {
         gFFI.invokeMethod("enable_soft_keyboard", false);
       }
+
+      // Workaround for iOS: physical keyboard input fails after virtual keyboard is hidden
+      // https://github.com/flutter/flutter/issues/39900
+      // https://github.com/rustdesk/rustdesk/discussions/11843#discussioncomment-13499698 - Virtual keyboard issue
+      if (isIOS) {
+        _iosKeyboardWorkaroundTimer?.cancel();
+        _iosKeyboardWorkaroundTimer = Timer(Duration(milliseconds: 100), () {
+          if (!mounted) return;
+          _physicalFocusNode.unfocus();
+          _iosKeyboardWorkaroundTimer = Timer(Duration(milliseconds: 50), () {
+            if (!mounted) return;
+            _physicalFocusNode.requestFocus();
+          });
+        });
+      }
     } else {
+      _iosKeyboardWorkaroundTimer?.cancel();
+      _iosKeyboardWorkaroundTimer = null;
       _timer?.cancel();
       _timer = Timer(kMobileDelaySoftKeyboardFocus, () {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,

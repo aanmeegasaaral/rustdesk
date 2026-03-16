@@ -1124,18 +1124,23 @@ class CustomAlertDialog extends StatelessWidget {
 
 Widget createDialogContent(String text) {
   final RegExp linkRegExp = RegExp(r'(https?://[^\s]+)');
+  bool hasLink = linkRegExp.hasMatch(text);
+
+  // Early return: no link, use default theme color
+  if (!hasLink) {
+    return SelectableText(text, style: const TextStyle(fontSize: 15));
+  }
+
   final List<TextSpan> spans = [];
   int start = 0;
-  bool hasLink = false;
 
   linkRegExp.allMatches(text).forEach((match) {
-    hasLink = true;
     if (match.start > start) {
       spans.add(TextSpan(text: text.substring(start, match.start)));
     }
     spans.add(TextSpan(
       text: match.group(0) ?? '',
-      style: TextStyle(
+      style: const TextStyle(
         color: Colors.blue,
         decoration: TextDecoration.underline,
       ),
@@ -1153,13 +1158,9 @@ Widget createDialogContent(String text) {
     spans.add(TextSpan(text: text.substring(start)));
   }
 
-  if (!hasLink) {
-    return SelectableText(text, style: const TextStyle(fontSize: 15));
-  }
-
   return SelectableText.rich(
     TextSpan(
-      style: TextStyle(color: Colors.black, fontSize: 15),
+      style: const TextStyle(fontSize: 15),
       children: spans,
     ),
   );
@@ -3062,6 +3063,11 @@ Future<void> start_service(bool is_start) async {
 }
 
 Future<bool> canBeBlocked() async {
+  if (isWeb) {
+    // Web can only act as a controller, never as a controlled side,
+    // so it should never be blocked by a remote session.
+    return false;
+  }
   // First check control permission
   final controlPermission = await bind.mainGetCommon(
       key: "is-remote-modify-enabled-by-control-permissions");
@@ -4111,4 +4117,44 @@ String mouseButtonsToPeer(int buttons) {
     default:
       return '';
   }
+}
+
+/// Build an avatar widget from an avatar URL or data URI string.
+/// Returns [fallback] if avatar is empty or cannot be decoded.
+/// [borderRadius] defaults to [size]/2 (circle).
+Widget? buildAvatarWidget({
+  required String avatar,
+  required double size,
+  double? borderRadius,
+  Widget? fallback,
+}) {
+  final trimmed = avatar.trim();
+  if (trimmed.isEmpty) return fallback;
+
+  ImageProvider? imageProvider;
+  if (trimmed.startsWith('data:image/')) {
+    final comma = trimmed.indexOf(',');
+    if (comma > 0) {
+      try {
+        imageProvider = MemoryImage(base64Decode(trimmed.substring(comma + 1)));
+      } catch (_) {}
+    }
+  } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    imageProvider = NetworkImage(trimmed);
+  }
+
+  if (imageProvider == null) return fallback;
+
+  final radius = borderRadius ?? size / 2;
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(radius),
+    child: Image(
+      image: imageProvider,
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) =>
+          fallback ?? SizedBox.shrink(),
+    ),
+  );
 }
