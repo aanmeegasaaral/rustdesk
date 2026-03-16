@@ -3005,8 +3005,23 @@ pub mod server_side {
     #[no_mangle]
     pub unsafe extern "system" fn Java_ffi_FFI_startService(_env: JNIEnv, _class: JClass) {
         log::debug!("startService from jvm");
-        config::Config::set_option("stop-service".into(), "".into());
-        crate::rendezvous_mediator::RendezvousMediator::restart();
+        super::main_start_service();
+    }
+    
+    #[no_mangle]
+    pub unsafe extern "system" fn Java_ffi_FFI_stopService(_env: JNIEnv, _class: JClass) {
+        log::debug!("stopService from jvm");
+        super::main_stop_service();
+    }
+    
+    #[no_mangle]
+    pub unsafe extern "system" fn Java_ffi_FFI_getMyId(
+        env: JNIEnv,
+        _class: JClass,
+    ) -> jstring {
+        let mut env = env;
+        let id = super::main_get_my_id();
+        env.new_string(id).unwrap_or_default().into_raw()
     }
 
     #[no_mangle]
